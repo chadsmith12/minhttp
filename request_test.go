@@ -1,0 +1,54 @@
+package minhttp_test
+
+import (
+	"strings"
+	"testing"
+
+	"github.com/chadsmith12/minhttp"
+)
+
+func TestBasicDecode(t *testing.T) {
+    testCases := []struct {
+        name string
+        input string
+        expected minhttp.HttpRequest
+    } {
+        {
+        	name:     "Should read simple GET Request",
+        	input:    "GET / HTTP/1.1\r\n\r\n",
+        	expected: minhttp.HttpRequest{
+                    Method: "GET",
+                    Path: "/",
+                    Version: "HTTP/1.1",
+                },
+        },
+        {
+        	name:     "Should read GET Request that has headers",
+        	input:    "GET /index.html HTTP/1.1\r\nHost: localhost:4221\r\nUser-Agent: curl/7.64.1\r\nAccept: */*\r\n\r\n",
+        	expected: minhttp.HttpRequest{
+                    Method: "GET",
+                    Path: "/index.html",
+                    Version: "HTTP/1.1",
+                },
+        },
+    }
+
+    for _, testCase := range testCases {
+        t.Run(testCase.name, func(t *testing.T) {
+            reader := strings.NewReader(testCase.input)
+            req, err := minhttp.Read(reader)
+            if err != nil {
+                t.Fatalf("Unexpected error: %v", err)
+            }
+            if req.Method != testCase.expected.Method {
+                t.Errorf("Expected method %s, got %s", testCase.expected.Method, req.Method)
+            }
+            if req.Path != testCase.expected.Path {
+                t.Errorf("Expected path %s, got %s", testCase.expected.Path, req.Path)
+            }
+            if req.Version != testCase.expected.Version {
+                t.Errorf("Expected version %s, got %s", testCase.expected.Version, req.Version)
+            }
+        })
+    }
+}

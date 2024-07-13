@@ -1,12 +1,11 @@
 package main
 
 import (
-	"bufio"
-	"bytes"
 	"fmt"
-	"io"
 	"net"
 	"os"
+
+	"github.com/chadsmith12/minhttp"
 )
 
 func main() {
@@ -22,32 +21,17 @@ func main() {
         os.Exit(1)
     }
     
-    req, err := readHttp(conn)
+    req, err := minhttp.Read(conn)
     if err != nil {
         fmt.Printf("Error reading http request: %s\n", err.Error())
         os.Exit(1)
     }
 
-    fmt.Printf("Read the following request: %s\n", req)
-    conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
-}
-
-func readHttp(conn net.Conn) (string, error) {
-    reader := bufio.NewReader(conn)
-    var buffer bytes.Buffer
-    for {
-        bytesRead, err := reader.ReadBytes('\r')
-        if err != nil {
-            if err == io.EOF {
-                break
-            }
-
-            return "", err
-        }
-        buffer.Write(bytesRead)
+    if req.Path != "/" {
+        minhttp.WriteNotFound(conn)
+        //conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
+    } else {
+        minhttp.WriteOk(conn)
+        //conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
     }
-
-    return buffer.String(), nil
 }
-
-var splitFunc bufio.SplitFunc
