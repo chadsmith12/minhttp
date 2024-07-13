@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"net"
 	"os"
+	"strings"
 
 	"github.com/chadsmith12/minhttp"
 )
@@ -27,11 +28,12 @@ func main() {
         os.Exit(1)
     }
 
-    if req.Path != "/" {
-        minhttp.WriteNotFound(conn)
-        //conn.Write([]byte("HTTP/1.1 404 Not Found\r\n\r\n"))
-    } else {
+    if req.Path == "/" {
         minhttp.WriteOk(conn)
-        //conn.Write([]byte("HTTP/1.1 200 OK\r\n\r\n"))
+    } else if strings.HasPrefix(req.Path, "/echo") {
+        components := strings.Split(req.Path, "/echo/")
+        minhttp.WriteText(conn, components[1]) 
+    } else {
+        minhttp.WriteNotFound(conn)
     }
 }
