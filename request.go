@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strings"
 )
 
 type HttpRequest struct {
@@ -30,8 +31,8 @@ func (headers *HeadersCollection) Add(headerBytes []byte) {
     if !found {
         return
     }
-    keyText := string(key)
-    valueText := string(value)
+    keyText := strings.TrimSpace(string(key))
+    valueText := strings.TrimSpace(string(value))
     
     current, ok := headers.Get(keyText)
     if ok {
@@ -66,7 +67,6 @@ func ReadRequest(reader io.Reader) (HttpRequest, error) {
     if !found {
         return HttpRequest{}, errors.New("failed to find http request to read")
     }
-    fmt.Printf("Read the Following Line: %s\n", scanner.Text())
 
     method, target, version := decodeRequestLine(scanner.Bytes())
     headers := &HeadersCollection{rawHeaders: make(map[string]string)}
@@ -74,7 +74,6 @@ func ReadRequest(reader io.Reader) (HttpRequest, error) {
         if scanner.Text() == "" {
             break
         }
-        fmt.Printf("Read the Following Line from headers: %s\n", scanner.Text())
         lineRead := scanner.Bytes()
         headers.Add(lineRead)
     }

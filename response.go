@@ -22,6 +22,11 @@ func WriteNotFound(writer io.Writer) {
     writer.Write([]byte("\r\n"))
 }
 
+func WriteBadRequest(writer io.Writer) {
+    writeStatus(writer, 400, "Bad Request")
+    writer.Write([]byte("\r\n"))
+}
+
 func writeContentHeaders(writer io.Writer, contentType string, content []byte) {
     contentHeader := fmt.Sprintf("Content-Type: %s\r\n", contentType)
     contentLength := fmt.Sprintf("Content-Length: %d\r\n", len(content))
