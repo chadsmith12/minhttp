@@ -22,7 +22,7 @@ func main() {
         os.Exit(1)
     }
     
-    req, err := minhttp.Read(conn)
+    req, err := minhttp.ReadRequest(conn)
     if err != nil {
         fmt.Printf("Error reading http request: %s\n", err.Error())
         os.Exit(1)
@@ -33,6 +33,9 @@ func main() {
     } else if strings.HasPrefix(req.Path, "/echo") {
         components := strings.Split(req.Path, "/echo/")
         minhttp.WriteText(conn, components[1]) 
+    } else if strings.HasPrefix(req.Path, "/user-agent") {
+        userAgent := req.Headers.UserAgent()
+        minhttp.WriteText(conn, userAgent)
     } else {
         minhttp.WriteNotFound(conn)
     }

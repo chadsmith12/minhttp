@@ -12,33 +12,77 @@ type HttpRequest struct {
     Method string
     Path string
     Version string
+    Headers *HeadersCollection
 }
 
-func Read(reader io.Reader) (HttpRequest, error) {
+type HeadersCollection struct {
+    rawHeaders map[string]string
+}
+
+func NewHeadersCollection() *HeadersCollection {
+   return &HeadersCollection{
+   	rawHeaders: map[string]string{},
+   } 
+}
+
+func (headers *HeadersCollection) Add(headerBytes []byte) {
+    key, value, found := bytes.Cut(headerBytes, []byte{':'})
+    if !found {
+        return
+    }
+    keyText := string(key)
+    valueText := string(value)
+    
+    current, ok := headers.Get(keyText)
+    if ok {
+        current = fmt.Sprintf("%s,%s", current, valueText)
+        return
+    }
+
+    headers.rawHeaders[keyText] = valueText
+}
+
+func (headers *HeadersCollection) Get(header string) (string, bool) {
+    value, ok := headers.rawHeaders[header]
+
+    return value, ok
+}
+
+func (headers *HeadersCollection) Len() int {
+    return len(headers.rawHeaders)
+}
+
+func (headers *HeadersCollection) UserAgent() string {
+    userAgent, _ := headers.Get("User-Agent")
+
+    return userAgent
+}
+
+func ReadRequest(reader io.Reader) (HttpRequest, error) {
     scanner := bufio.NewScanner(reader)
-    scanner.Split(split)
+    scanner.Split(readRequest)
 
     found := scanner.Scan()
     if !found {
         return HttpRequest{}, errors.New("failed to find http request to read")
     }
+    fmt.Printf("Read the Following Line: %s\n", scanner.Text())
 
-    if scanner.Err() != nil {
-        return HttpRequest{}, errors.New("failed to read http request")
+    method, target, version := decodeRequestLine(scanner.Bytes())
+    headers := &HeadersCollection{rawHeaders: make(map[string]string)}
+    for scanner.Scan() {
+        if scanner.Text() == "" {
+            break
+        }
+        fmt.Printf("Read the Following Line from headers: %s\n", scanner.Text())
+        lineRead := scanner.Bytes()
+        headers.Add(lineRead)
     }
-
-    fmt.Printf("Read a total of %d bytes\n", len(scanner.Bytes()))
-    return DecodeRequest(scanner.Bytes())
-}
-
-func DecodeRequest(msg []byte) (HttpRequest, error) {
-    requestLine := readLine(msg)
-    method, target, version := decodeRequestLine(requestLine)
-
     return HttpRequest{
-        Method: method,
-        Path: target,
-        Version: version,
+    	Method:  method,
+    	Path:    target,
+    	Version: version,
+        Headers: headers,
     }, nil
 }
 
@@ -56,15 +100,13 @@ func decodeRequestLine(requestLine []byte) (string, string, string) {
     return string(requestData[0]), string(requestData[1]), string(requestData[2])
 }
 
-func split(data []byte, atEOF bool) (advance int, token []byte, err error) {
-    fmt.Printf("CALLING SPLIT WITH %s\n", string(data))
-    header, _, found := bytes.Cut(data, []byte{'\r', '\n', '\r', '\n'})
+func readRequest(data []byte, atEOF bool) (advance int, token []byte, err error) {
+    requestData, _, found := bytes.Cut(data, []byte{'\r', '\n'})
     if !found {
-        fmt.Println("Failed to find \\r\\n\\r\\n")
         return 0, nil, nil
     }
 
-    totalLength := len(header) + 4
+    totalLength := len(requestData) + 2
 
-    return totalLength, header, nil
+    return totalLength, requestData, nil
 }

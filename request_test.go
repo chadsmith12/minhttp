@@ -8,6 +8,10 @@ import (
 )
 
 func TestBasicDecode(t *testing.T) {
+    headers := minhttp.NewHeadersCollection()
+    headers.Add([]byte("Host: localhost:4221"))
+    headers.Add([]byte("User-Agent: curl/7.64.1"))
+    headers.Add([]byte("Accept: */*"))
     testCases := []struct {
         name string
         input string
@@ -20,6 +24,7 @@ func TestBasicDecode(t *testing.T) {
                     Method: "GET",
                     Path: "/",
                     Version: "HTTP/1.1",
+                    Headers: minhttp.NewHeadersCollection(),
                 },
         },
         {
@@ -29,6 +34,7 @@ func TestBasicDecode(t *testing.T) {
                     Method: "GET",
                     Path: "/index.html",
                     Version: "HTTP/1.1",
+                    Headers: headers,
                 },
         },
     }
@@ -36,7 +42,7 @@ func TestBasicDecode(t *testing.T) {
     for _, testCase := range testCases {
         t.Run(testCase.name, func(t *testing.T) {
             reader := strings.NewReader(testCase.input)
-            req, err := minhttp.Read(reader)
+            req, err := minhttp.ReadRequest(reader)
             if err != nil {
                 t.Fatalf("Unexpected error: %v", err)
             }
@@ -48,6 +54,9 @@ func TestBasicDecode(t *testing.T) {
             }
             if req.Version != testCase.expected.Version {
                 t.Errorf("Expected version %s, got %s", testCase.expected.Version, req.Version)
+            }
+            if (req.Headers.Len() != testCase.expected.Headers.Len()) {
+                t.Errorf("Expected to get %d headers, got %d", testCase.expected.Headers.Len(), req.Headers.Len())
             }
         })
     }
