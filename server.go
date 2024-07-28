@@ -2,7 +2,6 @@ package minhttp
 
 import (
 	"context"
-	"io"
 	"net"
 
 	"github.com/chadsmith12/minhttp/tcp"
@@ -10,7 +9,7 @@ import (
 
 var defaultRouter *Router = NewRouter()
 
-type HttpHandler = func(HttpRequest, io.Writer) error
+type HttpHandler = func(HttpRequest, ResponseWriter) error
 
 type Server struct {
     Addr string
@@ -49,14 +48,15 @@ func MapPatch(template string, handler HttpHandler) {
 
 func (s *Server) defaultHttpHanlder(ctx context.Context, conn net.Conn) {
     req, err := ReadRequest(conn)
+    resp := &httpResponse{ request: &req, headers: NewHeadersCollection(), conn: conn }
     if err != nil {
-	WriteBadRequest(conn)
+	WriteBadRequest(resp)
     }
     route, params := s.router.MatchRoute(req.Method, req.Path)
     if route == nil {
-        WriteNotFound(conn)
+        WriteNotFound(resp)
 	return
     }
     req.Params = params
-    route.handler(req, conn)
+    route.handler(req, resp)
 }

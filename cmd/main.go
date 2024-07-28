@@ -14,25 +14,24 @@ func main() {
     directory := flag.String("directory", "/tmp", "The directory to retrieve the static files from")
     flag.Parse()
 
-    minhttp.MapGet("/", func(hr minhttp.HttpRequest, w io.Writer) error {
+    minhttp.MapGet("/", func(hr minhttp.HttpRequest, w minhttp.ResponseWriter) error {
 	minhttp.WriteOk(w)
 	return nil
     })
 
-    minhttp.MapGet("/echo/{str}", func(hr minhttp.HttpRequest, w io.Writer) error {
+    minhttp.MapGet("/echo/{str}", func(hr minhttp.HttpRequest, w minhttp.ResponseWriter) error {
 	echo := hr.Params["str"]
 	minhttp.WriteText(w, echo)	
 	return nil
     })
 
-    minhttp.MapGet("/user-agent", func(hr minhttp.HttpRequest, w io.Writer) error {
-	fmt.Println("inside user-agent request")
+    minhttp.MapGet("/user-agent", func(hr minhttp.HttpRequest, w minhttp.ResponseWriter) error {
 	minhttp.WriteText(w, hr.Headers.UserAgent())
 
 	return nil
     })
 
-    minhttp.MapGet("/files/{fileName}", func(hr minhttp.HttpRequest, w io.Writer) error {
+    minhttp.MapGet("/files/{fileName}", func(hr minhttp.HttpRequest, w minhttp.ResponseWriter) error {
 	filePath := path.Join(*directory, hr.Params["fileName"])
 	text, err := os.ReadFile(filePath)
 	if err != nil {
@@ -44,7 +43,7 @@ func main() {
 	return nil
     })
 
-    minhttp.MapPost("/files/{fileName}", func(hr minhttp.HttpRequest, w io.Writer) error {
+    minhttp.MapPost("/files/{fileName}", func(hr minhttp.HttpRequest, w minhttp.ResponseWriter) error {
 	bodyBytes, err := io.ReadAll(hr.Body)
 	if err != nil {
 	    minhttp.WriteInernalServerError(w, err.Error())

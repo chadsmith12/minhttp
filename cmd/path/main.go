@@ -2,26 +2,29 @@ package main
 
 import (
 	"fmt"
+	"io"
+
 	"github.com/chadsmith12/minhttp"
 )
 
 func main() {
     router := minhttp.NewRouter()
-    router.MapGet("/users")
-    router.MapGet("/users/list")
-    router.MapGet("/users/{id}")
-    router.MapGet("/users/{id}/profile")
-    router.MapGet("/echo/hello-world")
-    router.MapGet("/user-agent")
-    router.MapGet("/temp/{str}")
-    router.MapGet("/users/{id}/messages")
+    hander := func(hr minhttp.HttpRequest, w io.Writer) error { return nil}
+    router.MapGet("/users", hander)
+    router.MapGet("/users/list", hander)
+    router.MapGet("/users/{id}", hander)
+    router.MapGet("/users/{id}/profile", hander)
+    router.MapGet("/echo/hello-world", hander)
+    router.MapGet("/user-agent", hander)
+    router.MapGet("/temp/{str}", hander)
+    router.MapGet("/users/{id}/messages", hander)
     
-    fmt.Println(router.MatchRoute("/user-agent"))
-    fmt.Println(router.MatchRoute("/users"))
-    fmt.Println(router.MatchRoute("/users/10"))
-    fmt.Println(router.MatchRoute("/users/10/profile"))
-    fmt.Println(router.MatchRoute("/temp/hello"))
-    fmt.Println(router.MatchRoute("/profile"))
-    fmt.Println(router.MatchRoute("/users/list"))
-    fmt.Println(router.MatchRoute("/users/10/messages"))
+    fmt.Println(router.MatchRoute("GET", "/user-agent"))
+    fmt.Println(router.MatchRoute("GET", "/users"))
+    fmt.Println(router.MatchRoute("GET","/users/10"))
+    fmt.Println(router.MatchRoute("GET","/users/10/profile"))
+    fmt.Println(router.MatchRoute("GET","/temp/hello"))
+    fmt.Println(router.MatchRoute("GET","/profile"))
+    fmt.Println(router.MatchRoute("GET","/users/list"))
+    fmt.Println(router.MatchRoute("GET","/users/10/messages"))
 }

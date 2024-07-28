@@ -9,9 +9,9 @@ import (
 
 func TestBasicDecode(t *testing.T) {
     headers := minhttp.NewHeadersCollection()
-    headers.Add([]byte("Host: localhost:4221"))
-    headers.Add([]byte("User-Agent: curl/7.64.1"))
-    headers.Add([]byte("Accept: */*"))
+    headers.AddRaw([]byte("Host: localhost:4221"))
+    headers.AddRaw([]byte("User-Agent: curl/7.64.1"))
+    headers.AddRaw([]byte("Accept: */*"))
     testCases := []struct {
         name string
         input string

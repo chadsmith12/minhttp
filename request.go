@@ -31,7 +31,7 @@ func NewHeadersCollection() *HeadersCollection {
    } 
 }
 
-func (headers *HeadersCollection) Add(headerBytes []byte) {
+func (headers *HeadersCollection) AddRaw(headerBytes []byte) {
     key, value, found := bytes.Cut(headerBytes, []byte{':'})
     if !found {
         return
@@ -48,7 +48,7 @@ func (headers *HeadersCollection) Add(headerBytes []byte) {
     headers.rawHeaders[keyText] = valueText
 }
 
-func (headers *HeadersCollection) AddHeader(header string, value string) {
+func (headers *HeadersCollection) Add(header string, value string) {
     headers.rawHeaders[header] = value
 }
 
@@ -82,6 +82,12 @@ func (headers *HeadersCollection) ContentLength() int64 {
     return int64(contentLength)
 }
 
+func (headers *HeadersCollection) AcceptEncoding() string {
+    acceptEncoding, _ := headers.Get("Accept-Encoding")
+
+    return acceptEncoding
+}
+
 func ReadRequest(reader io.Reader) (HttpRequest, error) {
     bufReader := bufio.NewReader(reader)
     textReader := textproto.NewReader(bufReader)
@@ -97,7 +103,7 @@ func ReadRequest(reader io.Reader) (HttpRequest, error) {
     }
     headers := NewHeadersCollection() 
     for key, value := range readHeaders {
-        headers.AddHeader(key, value[0])
+        headers.Add(key, value[0])
     }
 
     bodyReader := io.LimitReader(bufReader, headers.ContentLength())
