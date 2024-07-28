@@ -12,8 +12,20 @@ func WriteText(writer io.Writer, text string) {
     writer.Write([]byte(text))
 }
 
+func WriteOctetStream(writer io.Writer, content []byte) {
+    writeStatus(writer, 200, "OK")
+    writeContentHeaders(writer, "application/octet-stream", content)
+    writer.Write([]byte("\r\n"))
+    writer.Write(content)
+}
+
 func WriteOk(writer io.Writer) {
     writeStatus(writer, 200, "OK")
+    writer.Write([]byte("\r\n"))
+}
+
+func WriteCreated(writer io.Writer) {
+    writeStatus(writer, 201, "Created")
     writer.Write([]byte("\r\n"))
 }
 
@@ -24,6 +36,11 @@ func WriteNotFound(writer io.Writer) {
 
 func WriteBadRequest(writer io.Writer) {
     writeStatus(writer, 400, "Bad Request")
+    writer.Write([]byte("\r\n"))
+}
+
+func WriteInernalServerError(writer io.Writer, err string) {
+   writeStatus(writer, 500, fmt.Sprintf("Internal Server Error - %s", err)) 
     writer.Write([]byte("\r\n"))
 }
 

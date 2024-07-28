@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/textproto"
+	"strconv"
 	"strings"
 )
 
@@ -14,6 +16,9 @@ type HttpRequest struct {
     Path string
     Version string
     Headers *HeadersCollection
+    Params map[string]string
+    ContentLength int64
+    Body io.Reader
 }
 
 type HeadersCollection struct {
@@ -43,6 +48,10 @@ func (headers *HeadersCollection) Add(headerBytes []byte) {
     headers.rawHeaders[keyText] = valueText
 }
 
+func (headers *HeadersCollection) AddHeader(header string, value string) {
+    headers.rawHeaders[header] = value
+}
+
 func (headers *HeadersCollection) Get(header string) (string, bool) {
     value, ok := headers.rawHeaders[header]
 
@@ -59,53 +68,58 @@ func (headers *HeadersCollection) UserAgent() string {
     return userAgent
 }
 
+func (headers *HeadersCollection) ContentLength() int64 {
+    contentLengthStr, ok := headers.Get("Content-Length")
+    if !ok {
+        return 0
+    }
+
+    contentLength, err := strconv.Atoi(contentLengthStr)
+    if err != nil {
+        return 0
+    }
+
+    return int64(contentLength)
+}
+
 func ReadRequest(reader io.Reader) (HttpRequest, error) {
-    scanner := bufio.NewScanner(reader)
-    scanner.Split(readRequest)
-
-    found := scanner.Scan()
-    if !found {
-        return HttpRequest{}, errors.New("failed to find http request to read")
+    bufReader := bufio.NewReader(reader)
+    textReader := textproto.NewReader(bufReader)
+    statusLine, err := textReader.ReadLine()
+    method, target, version, err := decodeStatusLine(statusLine)
+    if err != nil {
+        return HttpRequest{}, err
     }
 
-    method, target, version := decodeRequestLine(scanner.Bytes())
-    headers := &HeadersCollection{rawHeaders: make(map[string]string)}
-    for scanner.Scan() {
-        if scanner.Text() == "" {
-            break
-        }
-        lineRead := scanner.Bytes()
-        headers.Add(lineRead)
+    readHeaders, err := textReader.ReadMIMEHeader()
+    if err != nil {
+        return HttpRequest{}, err
     }
+    headers := NewHeadersCollection() 
+    for key, value := range readHeaders {
+        headers.AddHeader(key, value[0])
+    }
+
+    bodyReader := io.LimitReader(bufReader, headers.ContentLength())
+
     return HttpRequest{
     	Method:  method,
     	Path:    target,
     	Version: version,
         Headers: headers,
+        Params: make(map[string]string),
+        ContentLength: headers.ContentLength(),
+        Body: bodyReader,
     }, nil
 }
 
-func readLine(data []byte) []byte {
-    if index := bytes.Index(data, []byte("\r\n")); index >= 0 {
-        return data[:index] 
+
+func decodeStatusLine(statusLine string) (string, string, string, error) {
+    lineData := strings.Split(statusLine, " ")
+    if len(lineData) < 3 {
+        return "", "", "", errors.New("failed to read the status line.")
     }
 
-    return data
+    return lineData[0], lineData[1], lineData[2], nil
 }
 
-func decodeRequestLine(requestLine []byte) (string, string, string) {
-    requestData := bytes.Split(requestLine, []byte{' '}) 
-    
-    return string(requestData[0]), string(requestData[1]), string(requestData[2])
-}
-
-func readRequest(data []byte, atEOF bool) (advance int, token []byte, err error) {
-    requestData, _, found := bytes.Cut(data, []byte{'\r', '\n'})
-    if !found {
-        return 0, nil, nil
-    }
-
-    totalLength := len(requestData) + 2
-
-    return totalLength, requestData, nil
-}

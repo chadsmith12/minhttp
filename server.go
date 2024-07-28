@@ -2,45 +2,61 @@ package minhttp
 
 import (
 	"context"
+	"io"
 	"net"
-	"strings"
 
 	"github.com/chadsmith12/minhttp/tcp"
 )
 
+var defaultRouter *Router = NewRouter()
+
+type HttpHandler = func(HttpRequest, io.Writer) error
+
 type Server struct {
     Addr string
+    router *Router
 }
 
 func (server *Server) ListenAndServe() error {
     tcpBuilder := tcp.ServerBuilder()
     tcpBuilder.ListensOn(server.Addr)
-    tcpBuilder.UsesHandler(defaultHttpHanlder)
+    tcpBuilder.UsesHandler(server.defaultHttpHanlder)
 
     return tcpBuilder.Run()
 }
 
 func ListenAndServe(addr string) error {
-    server := &Server{ Addr: addr }
+    server := &Server{ Addr: addr, router: defaultRouter }
 
     return server.ListenAndServe()
 }
 
-func defaultHttpHanlder(ctx context.Context, conn net.Conn) {
-    req, err := ReadRequest(conn)
+func MapGet(template string, handler HttpHandler) {
+    defaultRouter.MapGet(template, handler)
+}
 
+func MapPost(template string, handler HttpHandler) {
+    defaultRouter.MapPost(template, handler)
+}
+
+func MapPut(template string, handler HttpHandler) {
+    defaultRouter.MapPut(template, handler)
+}
+
+func MapPatch(template string, handler HttpHandler) {
+    defaultRouter.MapPatch(template, handler)
+}
+
+func (s *Server) defaultHttpHanlder(ctx context.Context, conn net.Conn) {
+    req, err := ReadRequest(conn)
     if err != nil {
-        WriteBadRequest(conn)
+	WriteBadRequest(conn)
     }
-    if req.Path == "/" {
-        WriteOk(conn)
-    } else if strings.HasPrefix(req.Path, "/echo") {
-        components := strings.Split(req.Path, "/echo/")
-        WriteText(conn, components[1]) 
-    } else if strings.HasPrefix(req.Path, "/user-agent") {
-        userAgent := req.Headers.UserAgent()
-        WriteText(conn, userAgent)
-    } else {
+    route, params := s.router.MatchRoute(req.Method, req.Path)
+    if route == nil {
         WriteNotFound(conn)
+	return
     }
+    req.Params = params
+    route.handler(req, conn)
 }
