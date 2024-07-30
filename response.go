@@ -1,91 +1,114 @@
 package minhttp
 
 import (
+	"bytes"
+	"compress/gzip"
 	"fmt"
 	"io"
+	"slices"
 )
 
-type ResponseWriter interface {
-    WriteStatus(statusCode int, statusMessage string)
-    Write([]byte) (int, error)
-    Headers() *HeadersCollection
-}
-
-type httpResponse struct {
-    conn io.Writer
-    request *HttpRequest
-    headers *HeadersCollection
+type HttpResponseBuilder struct {
     statusCode int
     statusMessage string
-    wroteHeader bool
+    conn io.Writer
+    headers *HeadersCollection
+    request *HttpRequest
+    body []byte
 }
 
-func (resp *httpResponse) Headers() *HeadersCollection {
-    return resp.headers
+func NewResponse(writer io.Writer, request *HttpRequest) *HttpResponseBuilder {
+    return &HttpResponseBuilder{
+    	statusCode:    200,
+    	statusMessage: "OK",
+    	conn:          writer,
+    	headers:       NewHeadersCollection(),
+	request:       request,
+    	body:          []byte{},
+    } 
 }
 
-func (resp *httpResponse) WriteStatus(statusCode int, statusMessage string) {
-    if resp.wroteHeader {
-	return
+func (responseBuilder *HttpResponseBuilder) WithStatus(statusCode int, statusMessage string) *HttpResponseBuilder {
+    responseBuilder.statusCode = statusCode
+    responseBuilder.statusMessage = statusMessage
+
+    return responseBuilder
+}
+
+func (responseBuilder *HttpResponseBuilder) WithContent(contentType string, content []byte) *HttpResponseBuilder {
+    // if we support gzip, use it
+    if slices.Contains(responseBuilder.request.AcceptEncoding, "gzip") {
+	return responseBuilder.WithGzip(contentType, content)
     }
 
-    resp.statusCode = statusCode
-    resp.statusMessage = statusMessage
-    resp.wroteHeader = true
-
-    writeStatus(resp.conn, resp.statusCode, resp.statusMessage)
+    responseBuilder.headers.Add("Content-Type", contentType)
+    responseBuilder.headers.Add("Content-Lenth", fmt.Sprint(len(content)))
+    responseBuilder.body = content
+    return responseBuilder
 }
 
-func (resp *httpResponse) Write(data []byte) (int, error) {
-    resp.finishRequest()
-    fmt.Fprint(resp.conn, "\r\n")
-    return resp.conn.Write(data)
+func (responseBuilder *HttpResponseBuilder) WithGzip(contentType string, content []byte) *HttpResponseBuilder {
+    var gzipBuffer bytes.Buffer
+    gzipWriter := gzip.NewWriter(&gzipBuffer)
+    gzipWriter.Write(content)
+    gzipWriter.Close()
+
+    responseBuilder.headers.Add("Content-Encoding", "gzip")
+    responseBuilder.headers.Add("Content-Type", contentType)
+    responseBuilder.headers.Add("Content-Lenth", fmt.Sprint(len(gzipBuffer.Bytes())))
+    responseBuilder.body = gzipBuffer.Bytes()
+    return responseBuilder
 }
 
-func (resp *httpResponse) finishRequest() {
-    if !resp.wroteHeader {
-	resp.WriteStatus(200, "OK")
+func (responseBuilder *HttpResponseBuilder) WithHeader(key, value string) *HttpResponseBuilder {
+    responseBuilder.headers.Add(key, value)
+    return responseBuilder
+}
+
+func (responseBuilder *HttpResponseBuilder) Write() {
+    writeStatus(responseBuilder.conn, responseBuilder.statusCode, responseBuilder.statusMessage)
+    for header, value := range responseBuilder.headers.rawHeaders {
+	fmt.Fprintf(responseBuilder.conn, "%s: %s\r\n", header, value)
     }
-    
-    for header, value := range resp.headers.rawHeaders {
-	fmt.Fprintf(resp.conn, "%s: %s\r\n", header, value)
+    fmt.Fprint(responseBuilder.conn, "\r\n")
+
+    if len(responseBuilder.body) > 0 {
+	responseBuilder.conn.Write(responseBuilder.body)
     }
 }
 
-func WriteText(writer ResponseWriter, text string) {
-    writer.Headers().Add("Content-Type", "text/plain")
-    writer.Headers().Add("Content-Length", fmt.Sprint(len(text)))
-    writer.Write([]byte(text))
+func WriteText(builder *HttpResponseBuilder, text string) {
+    builder.WithContent("text/plain", []byte(text))
+    builder.Write()
 }
 
-func WriteOctetStream(writer ResponseWriter, content []byte) {
-    writer.Headers().Add("Content-Type", "text/plain")
-    writer.Headers().Add("Content-Length", fmt.Sprint(len(content)))
-    writer.Write(content)
+func WriteOctetStream(builder *HttpResponseBuilder, content []byte) {
+    builder.WithContent("application/octet-stream", content)
+    builder.Write()
 }
 
-func WriteOk(writer ResponseWriter) {
-    writer.Write([]byte{})
+func WriteOk(builder *HttpResponseBuilder) {
+    builder.Write()
 }
 
-func WriteCreated(writer ResponseWriter) {
-    writer.WriteStatus(201, "Created")
-    writer.Write([]byte{})
+func WriteCreated(builder *HttpResponseBuilder) {
+    builder.WithStatus(201, "Created")
+    builder.Write()
 }
 
-func WriteNotFound(writer ResponseWriter) {
-    writer.WriteStatus(404, "Not Found")
-    writer.Write([]byte{})
+func WriteNotFound(builder *HttpResponseBuilder) {
+    builder.WithStatus(404, "Not Found")
+    builder.Write()
 }
 
-func WriteBadRequest(writer ResponseWriter) {
-    writer.WriteStatus(400, "Bad Request")
-    writer.Write([]byte{})
+func WriteBadRequest(builder *HttpResponseBuilder) {
+    builder.WithStatus(400, "Bad Request")
+    builder.Write()
 }
 
-func WriteInernalServerError(writer ResponseWriter, err string) {
-    writer.WriteStatus(500, fmt.Sprintf("Internal Server Error - %s", err)) 
-    writer.Write([]byte{})
+func WriteInternalServerError(builder *HttpResponseBuilder) {
+    builder.WithStatus(500, "Internal Server Error")
+    builder.Write()
 }
 
 func writeStatus(writer io.Writer, statusCode int, statusText string) {

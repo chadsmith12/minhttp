@@ -18,6 +18,7 @@ type HttpRequest struct {
     Headers *HeadersCollection
     Params map[string]string
     ContentLength int64
+    AcceptEncoding []string
     Body io.Reader
 }
 
@@ -58,6 +59,10 @@ func (headers *HeadersCollection) Get(header string) (string, bool) {
     return value, ok
 }
 
+func (headers *HeadersCollection) Remove(header string) {
+   delete(headers.rawHeaders, header) 
+}
+
 func (headers *HeadersCollection) Len() int {
     return len(headers.rawHeaders)
 }
@@ -82,10 +87,18 @@ func (headers *HeadersCollection) ContentLength() int64 {
     return int64(contentLength)
 }
 
-func (headers *HeadersCollection) AcceptEncoding() string {
-    acceptEncoding, _ := headers.Get("Accept-Encoding")
+func (headers *HeadersCollection) AcceptEncoding() []string {
+    encodings, ok := headers.Get("Accept-Encoding")
+    if !ok {
+        return []string{}
+    }
 
-    return acceptEncoding
+    if len(encodings) == 0 {
+        return []string{}
+    }
+
+    acceptedEncodings := strings.Split(encodings, ", ")
+    return acceptedEncodings 
 }
 
 func ReadRequest(reader io.Reader) (HttpRequest, error) {
@@ -115,6 +128,7 @@ func ReadRequest(reader io.Reader) (HttpRequest, error) {
         Headers: headers,
         Params: make(map[string]string),
         ContentLength: headers.ContentLength(),
+        AcceptEncoding: headers.AcceptEncoding(),
         Body: bodyReader,
     }, nil
 }

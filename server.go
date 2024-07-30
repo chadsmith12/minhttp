@@ -9,7 +9,7 @@ import (
 
 var defaultRouter *Router = NewRouter()
 
-type HttpHandler = func(HttpRequest, ResponseWriter) error
+type HttpHandler = func(HttpRequest, *HttpResponseBuilder) error
 
 type Server struct {
     Addr string
@@ -48,7 +48,7 @@ func MapPatch(template string, handler HttpHandler) {
 
 func (s *Server) defaultHttpHanlder(ctx context.Context, conn net.Conn) {
     req, err := ReadRequest(conn)
-    resp := &httpResponse{ request: &req, headers: NewHeadersCollection(), conn: conn }
+    resp := NewResponse(conn, &req)
     if err != nil {
 	WriteBadRequest(resp)
     }
